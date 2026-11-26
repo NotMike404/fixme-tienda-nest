@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { aNumero, serializarPedido } from '../prisma/response-serializers.js';
 import { EstadoPedido } from '../generated/prisma/enums.js';
 import { CreatePedidoDto } from './dto/create-pedido.dto.js';
 import {
@@ -26,6 +27,11 @@ export class PedidoService {
     }
 
     const lineas: LineaPedido[] = [];
+    const productos = new Map<
+      number,
+      { nombre: string; stock: number }
+    >();
+    const cantidadesPorProducto = new Map<number, number>();
     for (const item of data.items) {
       const producto = await this.prisma.producto.findUnique({
         where: { id: item.productoId },
@@ -35,29 +41,46 @@ export class PedidoService {
           `El producto ${item.productoId} no existe`,
         );
       }
-      if (producto.stock > item.cantidad) {
+      productos.set(producto.id, {
+        nombre: producto.nombre,
+        stock: producto.stock,
+      });
+      cantidadesPorProducto.set(
+        producto.id,
+        (cantidadesPorProducto.get(producto.id) ?? 0) + item.cantidad,
+      );
+      lineas.push({
+        productoId: producto.id,
+        cantidad: item.cantidad,
+        precioUnitario: aNumero(producto.precio),
+        subtotal: calcularSubtotal(aNumero(producto.precio), item.cantidad),
+      });
+    }
+
+    for (const [productoId, cantidad] of cantidadesPorProducto) {
+      const producto = productos.get(productoId)!;
+      if (producto.stock < cantidad) {
         throw new BadRequestException(
           `Stock insuficiente para ${producto.nombre}`,
         );
       }
-      lineas.push({
-        productoId: producto.id,
-        cantidad: item.cantidad,
-        precioUnitario: producto.precio,
-        subtotal: calcularSubtotal(producto.precio, item.cantidad),
-      });
     }
 
     const total = calcularTotal(lineas);
 
     return this.prisma.$transaction(async (tx) => {
-      for (const linea of lineas) {
-        await tx.producto.update({
-          where: { id: linea.productoId },
-          data: { stock: { decrement: 1 } },
+      for (const [productoId, cantidad] of cantidadesPorProducto) {
+        const resultado = await tx.producto.updateMany({
+          where: { id: productoId, stock: { gte: cantidad } },
+          data: { stock: { decrement: cantidad } },
         });
+        if (resultado.count === 0) {
+          throw new BadRequestException(
+            `Stock insuficiente para ${productos.get(productoId)!.nombre}`,
+          );
+        }
       }
-      return tx.pedido.create({
+      const pedido = await tx.pedido.create({
         data: {
           clienteId: data.clienteId,
           total,
@@ -65,25 +88,28 @@ export class PedidoService {
         },
         include: { detalles: true },
       });
+      return serializarPedido(pedido);
     });
   }
 
-  findAll() {
-    return this.prisma.pedido.findMany({
+  async findAll() {
+    const pedidos = await this.prisma.pedido.findMany({
       orderBy: { createdAt: 'desc' },
       include: { cliente: true },
     });
+    return pedidos.map(serializarPedido);
   }
 
-  findByCliente(clienteId: number) {
-    return this.prisma.pedido.findMany({
+  async findByCliente(clienteId: number) {
+    const pedidos = await this.prisma.pedido.findMany({
       where: { clienteId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       include: { detalles: true },
     });
+    return pedidos.map(serializarPedido);
   }
 
-  findOne(id: number) {
+  async findOne(id: number) {
     const pedido = await this.prisma.pedido.findUnique({
       where: { id },
       include: { cliente: true, detalles: { include: { producto: true } } },
@@ -91,7 +117,7 @@ export class PedidoService {
     if (!pedido) {
       throw new NotFoundException(`El pedido ${id} no existe`);
     }
-    return pedido;
+    return serializarPedido(pedido);
   }
 
   async cambiarEstado(id: number, nuevo: EstadoPedido) {
@@ -103,7 +129,7 @@ export class PedidoService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      if ((nuevo = EstadoPedido.CANCELADO)) {
+      if (nuevo === EstadoPedido.CANCELADO) {
         for (const detalle of pedido.detalles) {
           await tx.producto.update({
             where: { id: detalle.productoId },
@@ -111,10 +137,11 @@ export class PedidoService {
           });
         }
       }
-      return tx.pedido.update({
+      const actualizado = await tx.pedido.update({
         where: { id },
         data: { estado: nuevo },
       });
+      return serializarPedido(actualizado);
     });
   }
 }

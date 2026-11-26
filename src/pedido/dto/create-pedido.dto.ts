@@ -30,5 +30,6 @@ export class CreatePedidoDto {
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
+  @Type(() => ItemPedidoDto)
   items!: ItemPedidoDto[];
 }

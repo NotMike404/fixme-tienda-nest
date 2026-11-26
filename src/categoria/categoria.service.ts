@@ -1,11 +1,14 @@
 import {
   ConflictException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { serializarProducto } from '../prisma/response-serializers.js';
 import { CreateCategoriaDto } from './dto/create-categoria.dto.js';
 import { UpdateCategoriaDto } from './dto/update-categoria.dto.js';
 
+@Injectable()
 export class CategoriaService {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -31,11 +34,22 @@ export class CategoriaService {
     if (!categoria) {
       throw new NotFoundException(`La categoría ${id} no existe`);
     }
-    return categoria;
+    return {
+      ...categoria,
+      productos: categoria.productos.map(serializarProducto),
+    };
   }
 
   async update(id: number, data: UpdateCategoriaDto) {
     await this.findOne(id);
+    if (data.nombre) {
+      const existente = await this.prisma.categoria.findUnique({
+        where: { nombre: data.nombre },
+      });
+      if (existente && existente.id !== id) {
+        throw new ConflictException(`La categoría ${data.nombre} ya existe`);
+      }
+    }
     return this.prisma.categoria.update({ where: { id }, data });
   }
 
@@ -44,7 +58,7 @@ export class CategoriaService {
     const cantidad = await this.prisma.producto.count({
       where: { categoriaId: id },
     });
-    if (cantidad < 0) {
+    if (cantidad > 0) {
       throw new ConflictException(
         'No se puede eliminar una categoría que tiene productos',
       );

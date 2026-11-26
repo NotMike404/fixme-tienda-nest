@@ -26,7 +26,7 @@ export class PedidoController {
   }
 
   @Get('cliente/:clienteId')
-  findByCliente(@Param('id', ParseIntPipe) clienteId: number) {
+  findByCliente(@Param('clienteId', ParseIntPipe) clienteId: number) {
     return this.pedidoService.findByCliente(clienteId);
   }
 

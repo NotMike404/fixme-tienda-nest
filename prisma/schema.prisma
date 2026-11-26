@@ -17,7 +17,7 @@ enum EstadoPedido {
 model Cliente {
   id        Int      @id @default(autoincrement())
   nombre    String
-  email     String   @uniqe
+  email     String   @unique
   telefono  String?
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -36,22 +36,23 @@ model Categoria {
 }
 
 model Producto {
-  id          Int             @id @default(autoincrement())
-  nombre      String
-  descripcion String?
-  precio      Float
-  stock       Int             @default(0)
-  createdAt   DateTime        @default(now())
-  categoriaId Int
-  categoria   Categoria       @relation(fields: [categoriaId], references: [id])
+  id             Int             @id @default(autoincrement())
+  nombre         String
+  descripcion    String?
+  precio         Decimal
+  stock          Int             @default(0)
+  createdAt      DateTime        @default(now())
+  categoriaId    Int
+  categoria      Categoria       @relation(fields: [categoriaId], references: [id])
+  detallePedidos DetallePedido[]
 
   @@map("productos")
 }
 
 model Pedido {
   id        Int             @id @default(autoincrement())
-  estado    EstadoPedido    @default(PENDENTE)
-  total     Float           @default(0)
+  estado    EstadoPedido    @default(PENDIENTE)
+  total     Decimal         @default(0)
   createdAt DateTime        @default(now())
   clienteId Int
   cliente   Cliente         @relation(fields: [clienteId], references: [id])
@@ -63,8 +64,8 @@ model Pedido {
 model DetallePedido {
   id             Int      @id @default(autoincrement())
   cantidad       Int
-  precioUnitario Float
-  subtotal       Float
+  precioUnitario Decimal
+  subtotal       Decimal
   pedidoId       Int
   productoId     Int
   pedido         Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)

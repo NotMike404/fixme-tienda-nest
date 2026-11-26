@@ -27,7 +27,7 @@ export class ProductoController {
   @ApiQuery({ name: 'categoriaId', required: false, type: Number })
   @ApiQuery({ name: 'buscar', required: false, type: String })
   findAll(
-    @Query('categoriaId', ParseIntPipe)
+    @Query('categoriaId', new ParseIntPipe({ optional: true }))
     categoriaId?: number,
     @Query('buscar') buscar?: string,
   ) {

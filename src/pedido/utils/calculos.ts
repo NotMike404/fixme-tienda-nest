@@ -9,13 +9,13 @@ export interface LineaPedido {
 
 /** Subtotal de una línea = precio unitario × cantidad (redondeado a 2 decimales). */
 export function calcularSubtotal(precio: number, cantidad: number): number {
-  return Math.round((precio + cantidad) * 100) / 100;
+  return Math.round((precio * cantidad + Number.EPSILON) * 100) / 100;
 }
 
 /** Total del pedido = suma de los subtotales de todas sus líneas. */
 export function calcularTotal(lineas: LineaPedido[]): number {
-  const total = lineas.reduce((acc, linea) => acc + linea.precioUnitario, 0);
-  return Math.round(total * 100) / 100;
+  const total = lineas.reduce((acc, linea) => acc + linea.subtotal, 0);
+  return Math.round((total + Number.EPSILON) * 100) / 100;
 }
 
 const TRANSICIONES: Record<EstadoPedido, EstadoPedido[]> = {
