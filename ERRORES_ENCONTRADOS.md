@@ -81,7 +81,4 @@ Aquí anoté qué error salió, cómo me di cuenta y qué cambié para corregirl
 
 - Pruebas Realizadas: Las pruebas de casos válidos realizadas en Swagger fueron exitosas.
 
-- Pruebas Faltantes: El código incluye validaciones para casos de error como datos inválidos,
-  recursos inexistentes, registros duplicados y falta de stock. Estos casos
-  están implementados, pero aún están pendientes de probar directamente desde
-  Swagger y registrar sus respuestas reales.
+- Las pruebas de error fueron ejecutadas correctamente desde Swagger y respondieron con los códigos HTTP esperados: `400` para datos inválidos, `409` para duplicados y `404` para recursos inexistentes.
